@@ -37,7 +37,7 @@ import {
   isMessengerBubbleAvailable,
   isMessengerBubbleEnabled
 } from './utils/messengerBubble';
-import { supabaseUrl, supabaseAnonKey } from './lib/supabase';
+import { supabaseUrl, supabaseAnonKey, supabaseProxyUrl } from './lib/supabase';
 
 // Views
 import { DashboardView } from './views/DashboardView';
@@ -556,7 +556,11 @@ const refreshStories = () => {
     let polling = false;
     const pollTimer = window.setInterval(() => {
       if (polling || document.visibilityState !== 'visible') return;
-      if (getSyncStatus().realtime === 'SUBSCRIBED') return;
+      // Avec le proxy multi-fournisseurs, Realtime reste branche sur le projet
+      // Supabase direct : il ne voit pas les changements ecrits sur D1 ou les
+      // autres fournisseurs. Le sondage doit donc tourner meme si Realtime
+      // indique SUBSCRIBED.
+      if (!supabaseProxyUrl && getSyncStatus().realtime === 'SUBSCRIBED') return;
       polling = true;
       void (async () => {
         try {
