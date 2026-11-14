@@ -1,3 +1,4 @@
+import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase, supabaseDirect, isSupabaseConfigured } from '../lib/supabase';
 import { STORAGE_KEYS, SYNCED_KEYS, PENDING_IMAGE_UPLOADS, isSyncedKey, isImageKey, isFeedImageKey, messageImageKey, storyImageKey, publicationImageKey, MEMBER_IMAGE_PREFIX, MEMBER_AVATAR_REF, MEMBER_COVER_REF, memberAvatarKey, memberCoverKey } from './storageKeys';
 import { deletedIdsFor, isTombstoneKey, pruneDeletedFromCollections } from './tombstones';
@@ -43,6 +44,12 @@ const pushTimers: Record<string, number> = {};
 // profile edited by the user on another device.
 let hydrationReady = false;
 const queuedPushes = new Map<string, unknown>();
+
+// Canal Realtime utilise pour diffuser un changement des qu'il est ecrit dans
+// le stockage actif (D1 via le proxy). Supabase Realtime ne voit pas les
+// ecritures faites dans D1 : sans cette diffusion, les messages n'arriveraient
+// qu'au prochain sondage (plusieurs secondes de retard).
+let activeChannel: RealtimeChannel | null = null;
 
 type AnyRecord = Record<string, unknown>;
 
@@ -910,6 +917,26 @@ function writeMerged(key: string, remoteValue: unknown, preferLocal = false): vo
   if (isTombstoneKey(key)) pruneDeletedFromCollections();
 }
 
+/**
+ * Previent les autres appareils qu'une collection vient de changer. Le payload
+ * ne contient que la cle : chaque appareil relit la valeur par le proxy, ce qui
+ * evite d'envoyer des collections entieres dans le canal Realtime.
+ */
+function broadcastKey(key: string, deleted = false): void {
+  if (!activeChannel) return;
+  if (!SYNCED_KEYS.includes(key)) return;
+  void activeChannel
+    .send({ type: 'broadcast', event: 'change', payload: { key, deleted } })
+    .then((status) => {
+      if (status !== 'ok') {
+        console.warn(`[Supabase] diffusion "${key}" non confirmee:`, status);
+      }
+    })
+    .catch(() => {
+      /* le sondage periodique reste le filet de securite */
+    });
+}
+
 async function upsertKey(key: string, value: unknown): Promise<boolean> {
   if (!supabase) return false;
   const { error } = await supabase.from(TABLE).upsert(
@@ -920,6 +947,7 @@ async function upsertKey(key: string, value: unknown): Promise<boolean> {
     console.warn(`[Supabase] push failed for "${key}":`, error.message);
     return false;
   }
+  broadcastKey(key);
   return true;
 }
 
@@ -1130,6 +1158,7 @@ export function deleteKey(key: string): void {
     .eq('key', key)
     .then(({ error }) => {
       if (error) console.warn(`[Supabase] delete failed for "${key}":`, error.message);
+      else broadcastKey(key, true);
     });
 }
 
@@ -1145,7 +1174,7 @@ export function subscribeToSupabase(onRemoteChange: (key: string) => void): () =
   const client = supabaseDirect;
 
   const channel = client
-    .channel('app_state_changes')
+    .channel('app_state_changes', { config: { broadcast: { self: false } } })
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: TABLE },
@@ -1171,11 +1200,29 @@ export function subscribeToSupabase(onRemoteChange: (key: string) => void): () =
         }
       }
     )
+    // Les ecritures partent vers D1 (proxy) : Postgres ne les voit pas. Le
+    // client qui vient d'ecrire diffuse donc la cle, et les autres appareils
+    // relisent la valeur par HTTP immediatement au lieu d'attendre le sondage.
+    .on('broadcast', { event: 'change' }, ({ payload }) => {
+      const data = payload as { key?: unknown; deleted?: unknown };
+      const key = typeof data?.key === 'string' ? data.key : null;
+      if (!key || !SYNCED_KEYS.includes(key)) return;
+      if (data.deleted === true) {
+        localStorage.removeItem(key);
+        if (isImageKey(key)) clearCachedImageRow(key);
+        onRemoteChange(key);
+        return;
+      }
+      void refetchKey(key).then(() => onRemoteChange(key));
+    })
     .subscribe((status) => {
       setSyncStatus({ realtime: status });
     });
 
+  activeChannel = channel;
+
   return () => {
+    if (activeChannel === channel) activeChannel = null;
     void client.removeChannel(channel);
   };
 }

@@ -575,8 +575,8 @@ const refreshStories = () => {
       })();
     }, 30000);
 
-    // Chat must stay live even when a realtime event is missed. Only the
-    // messages row is fetched (small), so this safety net costs very little.
+    // Filet de securite pour les clients qui n'ont pas encore la diffusion
+    // Realtime (ancien APK) : le message arrive au plus tard apres 5 secondes.
     const messagePollTimer = window.setInterval(() => {
       if (document.visibilityState !== 'visible') return;
       void Promise.all([
@@ -588,7 +588,7 @@ const refreshStories = () => {
           setAllBilletCommandes(StorageService.getBilletsCommandes());
         })
         .catch(() => { /* prochaine tentative */ });
-    }, 8000);
+    }, 5000);
 
     // Smartphones: realtime socket drops while the app sleeps in background
     // and missed (non-queued) events never replay. On resume / focus / network

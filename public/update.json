@@ -1,6 +1,6 @@
 {
-  "versionCode": 26,
-  "versionName": "1.25",
+  "versionCode": 27,
+  "versionName": "1.26",
   "apkUrl": "https://github.com/hariniainatafita/pro-num-tld/releases/latest/download/app-release.apk",
-  "notes": "Images du fil conservees durablement sur l'appareil (IndexedDB) meme si le serveur est indisponible, avec repli et bouton Reessayer. Bulle Messenger: un appui ouvre toujours le chat ou l'application. Billetterie, France 24 et correction des mots de passe inclus."
+  "notes": "Synchronisation quasi instantanee des messages et des publications entre le site et tous les telephones. Les donnees passent par le proxy multi-fournisseurs (D1) meme quand Supabase est sature. Installation conseillee sur les anciens APK qui ne recevaient plus les mises a jour."
 }
