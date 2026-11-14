@@ -12,6 +12,7 @@
 // Schéma SQL : supabase/neon-schema.sql
 
 import { neon } from '@neondatabase/serverless';
+import { pickOldestDisposable } from '../../_lib/appStateStore.js';
 
 const CAPACITOR_ORIGINS = new Set(['https://localhost', 'capacitor://localhost', 'http://localhost']);
 
@@ -250,6 +251,26 @@ export async function onRequest({ request, env, params }) {
   }
 
   try {
+    // Liberation demandee par le proxy de bascule quand le fournisseur est
+    // plein : ne supprime que les images les plus anciennes.
+    const searchParams = new URL(request.url).searchParams;
+    if (searchParams.get('evict') === 'oldest') {
+      const limit = Math.min(
+        Math.max(Number.parseInt(searchParams.get('limit') || '', 10) || 200, 1),
+        2000
+      );
+      const candidates = await sql`
+        SELECT key, updated_at FROM app_state ORDER BY updated_at ASC LIMIT ${limit * 5}
+      `;
+      const victims = pickOldestDisposable(candidates, limit);
+      if (victims.length > 0) {
+        await sql`
+          DELETE FROM app_state WHERE key = ANY(${victims.map((victim) => victim.key)}::text[])
+        `;
+      }
+      return json(request, 200, { evicted: victims.length });
+    }
+
     if (request.method === 'GET' || request.method === 'HEAD') {
       return await handleGet(sql, request, new URL(request.url).searchParams);
     }

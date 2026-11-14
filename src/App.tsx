@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { StorageService } from './utils/storage';
-import { subscribeToSupabase, hydrateFromSupabase, pullKeyFromSupabase } from './utils/supabaseSync';
+import { subscribeToSupabase, hydrateFromSupabase, pullKeyFromSupabase, getSyncStatus } from './utils/supabaseSync';
 import { markOffline, usePresence } from './utils/presence';
 import { canAccessGroupData, canAccessView, canViewPublication, getVisibleGroupIds } from './utils/permissions';
 import { STORAGE_KEYS } from './utils/storageKeys';
@@ -550,26 +550,26 @@ const refreshStories = () => {
 
     // Android: the realtime socket can stay silent after a long sleep. As a
     // safety net, a light sync runs periodically while the screen is visible so
-    // messages, presence and profile photos always end up appearing.
-    let pollTimer: number | undefined;
+    // messages, presence and profile photos always end up appearing. The same
+    // poll also covers web sessions where Realtime is unavailable (quota
+    // reached, proxy failover, restrictive network).
     let polling = false;
-    if (isNativeApp()) {
-      pollTimer = window.setInterval(() => {
-        if (polling || document.visibilityState !== 'visible') return;
-        polling = true;
-        void (async () => {
-          try {
-            await hydrateFromSupabase();
-            await StorageService.hydrateMemberImages();
-            refreshAll();
-          } catch {
-            /* prochaine tentative */
-          } finally {
-            polling = false;
-          }
-        })();
-      }, 45000);
-    }
+    const pollTimer = window.setInterval(() => {
+      if (polling || document.visibilityState !== 'visible') return;
+      if (getSyncStatus().realtime === 'SUBSCRIBED') return;
+      polling = true;
+      void (async () => {
+        try {
+          await hydrateFromSupabase();
+          await StorageService.hydrateMemberImages();
+          refreshAll();
+        } catch {
+          /* prochaine tentative */
+        } finally {
+          polling = false;
+        }
+      })();
+    }, 30000);
 
     // Chat must stay live even when a realtime event is missed. Only the
     // messages row is fetched (small), so this safety net costs very little.
