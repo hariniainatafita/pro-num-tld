@@ -923,7 +923,7 @@ function writeMerged(key: string, remoteValue: unknown, preferLocal = false): vo
  * evite d'envoyer des collections entieres dans le canal Realtime.
  */
 function broadcastKey(key: string, deleted = false): void {
-  if (!activeChannel) return;
+  if (!activeChannel || syncStatus.realtime !== 'SUBSCRIBED') return;
   if (!SYNCED_KEYS.includes(key)) return;
   void activeChannel
     .send({ type: 'broadcast', event: 'change', payload: { key, deleted } })

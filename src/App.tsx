@@ -573,10 +573,11 @@ const refreshStories = () => {
           polling = false;
         }
       })();
-    }, 30000);
+    }, 5000);
 
-    // Filet de securite pour les clients qui n'ont pas encore la diffusion
-    // Realtime (ancien APK) : le message arrive au plus tard apres 5 secondes.
+    // Realtime n'est pas disponible quand Supabase est sature (statut
+    // TIMED_OUT) : on relit la petite collection des messages toutes les
+    // 2 secondes via le proxy, ce qui donne un chat quasi instantane.
     const messagePollTimer = window.setInterval(() => {
       if (document.visibilityState !== 'visible') return;
       void Promise.all([
@@ -588,7 +589,7 @@ const refreshStories = () => {
           setAllBilletCommandes(StorageService.getBilletsCommandes());
         })
         .catch(() => { /* prochaine tentative */ });
-    }, 5000);
+    }, 2000);
 
     // Smartphones: realtime socket drops while the app sleeps in background
     // and missed (non-queued) events never replay. On resume / focus / network

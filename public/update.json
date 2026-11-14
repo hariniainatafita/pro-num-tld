@@ -1,6 +1,6 @@
 {
-  "versionCode": 27,
-  "versionName": "1.26",
+  "versionCode": 28,
+  "versionName": "1.27",
   "apkUrl": "https://github.com/hariniainatafita/pro-num-tld/releases/latest/download/app-release.apk",
-  "notes": "Synchronisation quasi instantanee des messages et des publications entre le site et tous les telephones. Les donnees passent par le proxy multi-fournisseurs (D1) meme quand Supabase est sature. Installation conseillee sur les anciens APK qui ne recevaient plus les mises a jour."
+  "notes": "Messages synchronises toutes les 2 secondes et donnees partagees toutes les 5 secondes via le proxy D1, sans dependre de Supabase Realtime. Installation obligatoire sur les anciens APK qui ne recevaient plus les mises a jour."
 }
