@@ -65,10 +65,11 @@ plusieurs services gratuits a la fois. Le proxy `functions/api/db/[[path]].js` :
 - lit en priorite le premier fournisseur qui contient les cles demandees, puis
   bascule automatiquement si une base est vide, pleine (quota) ou en panne ;
 - met un fournisseur en quarantaine 60 s apres un echec ;
-- si toutes les ecritures echouent, supprime les images les plus anciennes
-  (messages, stories, publications, avatars) puis reessaie. Les collections
-  metier (membres, groupes, finances, mots de passe...) ne sont jamais
-  supprimees.
+- si toutes les ecritures echouent et qu'un fournisseur signale un stockage
+  plein, supprime les images les plus anciennes (messages, stories,
+  publications, avatars) puis reessaie. Un simple depassement de bande
+  passante (egress) ne declenche aucune suppression. Les collections metier
+  (membres, groupes, finances, mots de passe...) ne sont jamais supprimees.
 
 Fournisseurs supportes : Cloudflare D1, Firebase Realtime Database, Upstash
 Redis, Neon et Supabase. Voir `.env.example` pour toutes les variables.
@@ -94,12 +95,14 @@ Redis, Neon et Supabase. Voir `.env.example` pour toutes les variables.
    ]
    ```
 
-5. Ajouter le secret GitHub `VITE_SUPABASE_PROXY_URL` =
-   `https://pro-num-tld.pages.dev/api/db` puis relancer le workflow.
+5. (Optionnel) En production, l'application utilise deja
+   `https://pro-num-tld.pages.dev/api/db` par defaut. Definir le secret GitHub
+   `VITE_SUPABASE_PROXY_URL` uniquement pour pointer vers un autre proxy, puis
+   relancer le workflow.
 6. Verifier l'etat : `https://pro-num-tld.pages.dev/api/db/health`.
 
-Sans `VITE_SUPABASE_PROXY_URL`, l'application reste en connexion directe
-(comportement precedent).
+En developpement local, l'application reste en connexion directe sauf si
+`VITE_SUPABASE_PROXY_URL` est defini.
 
 ## Ressources externes à provisionner après renommage
 

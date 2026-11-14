@@ -265,6 +265,10 @@ async function inspectResponse(response) {
   // ligne : ce n'est pas une panne, simplement une cle absente du fournisseur.
   const noRows = status === 406 && /PGRST116/.test(text);
   const full = !noRows && (status === 402 || status === 507 || quotaFromText(text));
+  // Quota de bande passante (egress) : liberer du stockage ne resout rien et
+  // supprimerait des images inutilement. Seuls les vrais "stockage plein"
+  // declenchent la liberation.
+  const egress = /egress|bandwidth|transfer quota/i.test(text);
   const retryable =
     !noRows &&
     (status === 401 ||
@@ -273,7 +277,7 @@ async function inspectResponse(response) {
       status === 429 ||
       status === 507 ||
       status >= 500);
-  return { status, text, noRows, full, retryable };
+  return { status, text, noRows, full, egress, retryable };
 }
 
 function isSingleAccept(request) {
@@ -504,7 +508,7 @@ async function writeWithReplication(projects, request, path, search, body) {
       }
       const info = await inspectResponse(response);
       recordFailure(project, info.text || `HTTP ${response.status}`, info.full);
-      if (info.full) full.set(project.url, project);
+      if (info.full && !info.egress) full.set(project.url, project);
       if (!firstError) firstError = response;
       else void response.body?.cancel();
     }
