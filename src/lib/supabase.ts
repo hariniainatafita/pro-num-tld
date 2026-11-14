@@ -7,7 +7,14 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undef
 // Quand elle est définie, seules les requêtes de DONNÉES (app_state) passent
 // par le proxy ; Auth, Realtime et Storage restent en direct pour ne pas
 // dépendre d'un relais WebSocket.
-const supabaseProxyUrl = import.meta.env.VITE_SUPABASE_PROXY_URL as string | undefined;
+const configuredProxyUrl = import.meta.env.VITE_SUPABASE_PROXY_URL as string | undefined;
+
+// En production, le proxy de bascule est le comportement par defaut : le site
+// et l'APK restent synchronises meme si le secret CI n'est pas defini. En
+// developpement, on reste en direct sur Supabase (sauf VITE_SUPABASE_PROXY_URL).
+const supabaseProxyUrl =
+  configuredProxyUrl ||
+  (import.meta.env.PROD ? 'https://pro-num-tld.pages.dev/api/db' : undefined);
 
 export { supabaseUrl, supabaseAnonKey, supabaseProxyUrl };
 
